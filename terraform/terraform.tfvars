@@ -20,4 +20,3 @@ jwt_secret_key = "super-secret-jwt-key-for-development-only"
 
 gemini_api_key = "..."
 
-groq_api_key = "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"
