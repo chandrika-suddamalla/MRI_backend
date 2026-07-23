@@ -17,5 +17,3 @@ max_replicas     = 3
 acr_password = "FV3yucr0A60ogdzKBleYgdQ2G2oxULRlSheev7RSCVkufU6LuwHjJQQJ99CGAC8vTInEqg7NAAACAZCRw1kJ"
 
 jwt_secret_key = "super-secret-jwt-key-for-development-only"
-
-gemini_api_key = "..."
