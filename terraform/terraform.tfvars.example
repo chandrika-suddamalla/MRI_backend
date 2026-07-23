@@ -11,3 +11,11 @@ sql_administrator_login   = "sqladmin"
 # Container image configuration
 container_image_name      = "fastapi-app"
 container_image_tag       = "latest"
+
+# Container sizing and scaling configuration.
+container_cpu             = 0.5
+container_memory          = "1Gi"
+min_replicas              = 1
+max_replicas              = 3
+
+# Secret values must be supplied through TF_VAR_* or a secure CI/CD secret store.

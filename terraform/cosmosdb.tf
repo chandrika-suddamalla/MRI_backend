@@ -23,10 +23,10 @@ resource "azurerm_cosmosdb_account" "mi_cosmosdb" {
   }
 
   public_network_access_enabled = true
-  
+
   # Allow force deletion without delays
   access_key_metadata_writes_enabled = false
-  
+
   tags = local.common_tags
 }
 

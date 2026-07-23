@@ -7,7 +7,7 @@ def test_settings_exposes_non_sensitive_values(monkeypatch):
     monkeypatch.setenv("APP_NAME", "Test App")
     monkeypatch.setenv("ENVIRONMENT", "testing")
     monkeypatch.setenv("JWT_ALGORITHM", "HS512")
-    monkeypatch.setenv("ACCESS_TOKEN_EXPIRE_MINUTES", "45")
+    monkeypatch.setenv("JWT_EXPIRY_MINUTES", "45")
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
     monkeypatch.setenv("DATABASE_NAME", "test.db")
 
