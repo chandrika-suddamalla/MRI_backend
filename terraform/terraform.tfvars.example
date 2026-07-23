@@ -1,0 +1,13 @@
+project                   = "mi-backend"
+environment               = "dev"
+location                  = "eastus"
+owner                     = "team@example.com"
+resource_group_tags       = {}
+
+# SQL Server credentials
+sql_administrator_login   = "sqladmin"
+# sql_administrator_password = "<secure-password>"  # Set via TF_VAR_sql_administrator_password or terraform apply -var
+
+# Container image configuration
+container_image_name      = "fastapi-app"
+container_image_tag       = "latest"
