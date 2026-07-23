@@ -1,2 +1,2 @@
-# MI_backend
+# MRI_backend
 Market Research  Intelligence Backend
