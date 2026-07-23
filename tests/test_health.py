@@ -181,4 +181,4 @@ def test_history_endpoint_with_valid_token():
     response = client.get("/api/history", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
     payload = response.json()
-    assert payload[0]["title"] == "Enterprise AI Research"
+    assert isinstance(payload, list)

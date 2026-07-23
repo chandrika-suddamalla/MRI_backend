@@ -32,6 +32,10 @@ class SecretsManager(ABC):
     def get_database_password(self) -> str:
         """Return the database password."""
 
+    @abstractmethod
+    def get_cosmos_key(self) -> str:
+        """Return the Cosmos DB account key."""
+
 
 class LocalSecretsManager(SecretsManager):
     """Local implementation that reads secrets from environment variables."""
@@ -44,6 +48,9 @@ class LocalSecretsManager(SecretsManager):
 
     def get_database_password(self) -> str:
         return os.getenv("DATABASE_PASSWORD", "replace_me")
+
+    def get_cosmos_key(self) -> str:
+        return os.getenv("COSMOS_KEY", "")
 
 
 # class AzureKeyVaultSecretsManager(SecretsManager):

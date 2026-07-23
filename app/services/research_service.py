@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from app.database.cosmos import CosmosStore, store
 from app.schemas.research import (
     CompetitorActivityOut,
     HallucinationCheckOut,
@@ -19,12 +20,13 @@ logger = logging.getLogger("market_research_api")
 class ResearchService:
     """Service containing research workflow business logic."""
 
-    def __init__(self) -> None:
+    def __init__(self, repository: CosmosStore | None = None) -> None:
         self.scraper = ArticleScraper()
         self.analyzer = MarketResearchAnalyzer()
+        self.repository = repository or store
 
-    def create_research(self, payload: ResearchRequest) -> ResearchResponse:
-        """Scrape, analyze, and merge article content into a structured report."""
+    def create_research(self, payload: ResearchRequest, user_id: str = "") -> ResearchResponse:
+        """Scrape, analyze, merge, and persist a structured report."""
         logger.info(
             "Research request received with competitors=%s topics=%s urls=%s context=%s",
             payload.competitors,
@@ -71,7 +73,7 @@ class ResearchService:
             overall_feedback=judge_result.overall_feedback or "",
         )
 
-        return ResearchResponse(
+        response = ResearchResponse(
             executiveSummary=report.executive_summary or "",
             themes=themes,
             marketTrends=list(report.market_trends or []),
@@ -82,6 +84,13 @@ class ResearchService:
             sourceTraceability=list(report.source_traceability or []),
             hallucinationCheck=hallucination_check,
         )
+        if user_id:
+            title = ", ".join([*payload.topics, *payload.competitors][:3]) or "Market research report"
+            self.repository.save_report(
+                user_id,
+                {"title": title, "request": payload.model_dump(), "response": response.model_dump()},
+            )
+        return response
 
     def _derive_theme_title(self, payload: ResearchRequest) -> str:
         tokens = [*payload.competitors, *payload.topics]

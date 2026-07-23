@@ -27,6 +27,10 @@ class AppConfig:
     access_token_expires_minutes: int
     log_level: str
     database_name: str
+    cosmos_endpoint: str
+    cosmos_database_name: str
+    cosmos_users_container: str
+    cosmos_reports_container: str
     api_prefix: str
     app_version: str
     debug: bool
@@ -41,6 +45,10 @@ class AppConfig:
             access_token_expires_minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             database_name=os.getenv("DATABASE_NAME", "market_research.db"),
+            cosmos_endpoint=os.getenv("COSMOS_ENDPOINT", ""),
+            cosmos_database_name=os.getenv("COSMOS_DATABASE_NAME", "mi-db"),
+            cosmos_users_container=os.getenv("COSMOS_USERS_CONTAINER", "users"),
+            cosmos_reports_container=os.getenv("COSMOS_REPORTS_CONTAINER", "reports"),
             api_prefix=os.getenv("API_PREFIX", "/api"),
             app_version=os.getenv("APP_VERSION", "0.1.0"),
             debug=os.getenv("DEBUG", "true").lower() == "true",

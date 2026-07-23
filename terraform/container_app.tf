@@ -1,4 +1,3 @@
-/* Temporarily commented out until Docker image is built and pushed to ACR
 # Container App deployment using a placeholder image from ACR.
 resource "azurerm_container_app" "mi_app" {
   name                         = local.container_app_name
@@ -21,6 +20,11 @@ resource "azurerm_container_app" "mi_app" {
     type = "SystemAssigned"
   }
 
+  secret {
+    name  = "cosmos-key"
+    value = azurerm_cosmosdb_account.mi_cosmosdb.primary_key
+  }
+
   template {
     container {
       name   = "fastapi-app"
@@ -36,6 +40,31 @@ resource "azurerm_container_app" "mi_app" {
       env {
         name  = "LOG_LEVEL"
         value = "info"
+      }
+
+      env {
+        name  = "COSMOS_ENDPOINT"
+        value = azurerm_cosmosdb_account.mi_cosmosdb.endpoint
+      }
+
+      env {
+        name  = "COSMOS_KEY"
+        secret_name = "cosmos-key"
+      }
+
+      env {
+        name  = "COSMOS_DATABASE_NAME"
+        value = azurerm_cosmosdb_sql_database.mi_database.name
+      }
+
+      env {
+        name  = "COSMOS_USERS_CONTAINER"
+        value = azurerm_cosmosdb_sql_container.users.name
+      }
+
+      env {
+        name  = "COSMOS_REPORTS_CONTAINER"
+        value = azurerm_cosmosdb_sql_container.reports.name
       }
     }
 
@@ -56,4 +85,3 @@ resource "azurerm_role_assignment" "acr_pull" {
   role_definition_name = "AcrPull"
   principal_id         = azurerm_container_app.mi_app.identity[0].principal_id
 }
-*/

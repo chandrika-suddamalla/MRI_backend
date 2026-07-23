@@ -36,6 +36,22 @@ class Settings:
         return self._config.database_name
 
     @property
+    def cosmos_database_name(self) -> str:
+        return self._config.cosmos_database_name
+
+    @property
+    def cosmos_endpoint(self) -> str:
+        return self._config.cosmos_endpoint
+
+    @property
+    def cosmos_users_container(self) -> str:
+        return self._config.cosmos_users_container
+
+    @property
+    def cosmos_reports_container(self) -> str:
+        return self._config.cosmos_reports_container
+
+    @property
     def api_prefix(self) -> str:
         return self._config.api_prefix
 

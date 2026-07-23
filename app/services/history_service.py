@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime
+from app.database.cosmos import CosmosStore, store
 
 
 class HistoryService:
-    """Service containing mock history retrieval logic."""
+    """Service for retrieving persisted research reports."""
 
-    def get_history(self) -> list[dict]:
-        """Return mock historical reports for now."""
-        return [
-            {
-                "id": 1,
-                "title": "Enterprise AI Research",
-                "created_at": datetime(2026, 7, 21, 10, 0, 0).isoformat(),
-            }
-        ]
+    def __init__(self, repository: CosmosStore | None = None) -> None:
+        self.repository = repository or store
+
+    def get_history(self, user_id: str) -> list[dict]:
+        return self.repository.list_reports(user_id)

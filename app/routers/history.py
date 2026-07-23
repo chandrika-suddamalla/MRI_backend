@@ -9,6 +9,5 @@ service = HistoryService()
 
 @router.get("/history", response_model=list[dict], status_code=status.HTTP_200_OK)
 def get_history(current_user: dict[str, str] = Depends(get_current_user)) -> list[dict]:
-    """Return mock historical reports for an authenticated user."""
-    _ = current_user
-    return service.get_history()
+    """Return persisted historical reports for the authenticated user."""
+    return service.get_history(current_user["sub"])

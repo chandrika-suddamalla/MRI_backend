@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Final
-
 from fastapi import HTTPException, status
 
 from app.core.security import create_access_token, hash_password, verify_password
