@@ -33,7 +33,8 @@ async def add_cors_headers(request: Request, call_next):
 
     if origin and (
         origin in settings.allowed_origins
-        or re.match(r"https://.*\.vercel\.app$", origin) is not None
+        or re.match(r"https://([a-z0-9-]+\.)*vercel\.app$", origin) is not None
+        or re.match(r"https://([a-z0-9-]+\.)*vercel\.app/.*$", origin) is not None
     ):
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
