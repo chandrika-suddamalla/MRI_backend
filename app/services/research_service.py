@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 from fastapi import HTTPException, status
 
+from app.database.cosmos import CosmosStore, store
 from app.schemas.research import CompetitorActivityOut, HallucinationCheckOut, ResearchRequest, ResearchResponse, ThemeOut
 from app.services.analysis import MarketResearchAnalyzer, NO_COMPETITOR, NO_THEME
 from app.services.scraper import SourceExtractionError, TrafilaturaScraper
@@ -12,11 +13,13 @@ logger = logging.getLogger("market_research_api.research")
 
 
 class ResearchService:
-    def __init__(self, scraper: TrafilaturaScraper | None = None, analyzer: MarketResearchAnalyzer | None = None) -> None:
+    def __init__(self, scraper: TrafilaturaScraper | None = None, analyzer: MarketResearchAnalyzer | None = None,
+                 repository: CosmosStore | None = None) -> None:
         self.scraper = scraper or TrafilaturaScraper()
         self.analyzer = analyzer or MarketResearchAnalyzer()
+        self.repository = repository or store
 
-    def create_research(self, payload: ResearchRequest) -> ResearchResponse:
+    def create_research(self, payload: ResearchRequest, user_id: str | None = None) -> ResearchResponse:
         articles, failures = [], []
         # Keep individual extraction errors visible while allowing useful sources to proceed.
         for url in payload.urls:
@@ -45,7 +48,7 @@ class ResearchService:
         traceability = [{"url": article["url"], "title": article.get("title") or "Untitled source", "status": "extracted",
                           "characters_extracted": len(article["article_text"])} for article in articles] + failures
         judge_payload = judge.model_dump()
-        return ResearchResponse(
+        response = ResearchResponse(
             executiveSummary=report.executive_summary,
             themes=themes,
             competitorActivities=activities,
@@ -72,3 +75,16 @@ class ResearchService:
             },
             llm_judge_result=judge_payload,
         )
+        if user_id:
+            history_payload = response.model_dump()
+            history_payload.update(
+                {
+                    "title": response.executiveSummary or "Untitled report",
+                    "summary": response.executiveSummary or "Report generated successfully",
+                    "competitors": [item.competitor for item in response.competitorActivities],
+                    "topics": [item.title for item in response.themes],
+                    "sources": [item.get("url") for item in traceability if isinstance(item, dict) and item.get("url")],
+                }
+            )
+            self.repository.save_report(str(user_id), history_payload)
+        return response

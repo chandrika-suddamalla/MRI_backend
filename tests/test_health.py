@@ -5,6 +5,7 @@ from jose import jwt
 
 from app.core.settings import settings
 from app.main import app
+from app.routers import research as research_router
 from app.schemas.research import ResearchRequest
 from app.services.llm.models import JudgeResult, MarketIntelligenceReport
 from app.services.research_service import ResearchService
@@ -105,6 +106,115 @@ def test_research_endpoint_with_valid_token():
     payload = response.json()
     assert payload["hallucinationCheck"]["status"] in {"Supported", "Needs review"}
     assert payload["themes"][0]["title"]
+
+
+def test_research_results_are_persisted_for_history_lookup(monkeypatch):
+    class DummyAnalyzer:
+        def analyze_articles(self, scraped_articles, competitors, topics, context):
+            return (
+                MarketIntelligenceReport(
+                    executive_summary="AI is changing enterprise workflows.",
+                    insights_grouped_by_theme=[],
+                    market_trends=[],
+                    competitor_activities=[],
+                    business_insights=[],
+                    statistics=[],
+                    companies_mentioned=[],
+                    source_traceability=[{"source_url": scraped_articles[0]["url"]}],
+                ),
+                JudgeResult(
+                    accuracy_score=100,
+                    completeness_score=100,
+                    hallucination_detection="No unsupported claims detected in the generated summary.",
+                    unsupported_claims=[],
+                    missing_information=[],
+                    overall_feedback="The report was generated from the supplied source content.",
+                    final_verdict="Pass",
+                ),
+            )
+
+    monkeypatch.setattr(research_router.service.scraper, "scrape_articles", lambda urls: [{"url": urls[0], "article_text": "AI is changing enterprise workflows."}])
+    research_router.service.analyzer = DummyAnalyzer()
+
+    login_response = client.post(
+        "/api/auth/login",
+        json={"email": "user@example.com", "password": "Password123!"},
+    )
+    token = login_response.json()["access_token"]
+
+    research_response = client.post(
+        "/api/research",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "competitors": ["OpenAI"],
+            "topics": ["AI"],
+            "urls": ["https://example.com"],
+            "context": "test context",
+        },
+    )
+    assert research_response.status_code == 200
+
+    history_response = client.get("/api/history", headers={"Authorization": f"Bearer {token}"})
+    assert history_response.status_code == 200
+    payload = history_response.json()
+    assert payload
+    assert any(item.get("executiveSummary") == research_response.json().get("executiveSummary") for item in payload)
+
+
+def test_history_endpoint_returns_displayable_report_metadata(monkeypatch):
+    class DummyAnalyzer:
+        def analyze_articles(self, scraped_articles, competitors, topics, context):
+            return (
+                MarketIntelligenceReport(
+                    executive_summary="AI is changing enterprise workflows.",
+                    insights_grouped_by_theme=[],
+                    market_trends=[],
+                    competitor_activities=[],
+                    business_insights=[],
+                    statistics=[],
+                    companies_mentioned=[],
+                    source_traceability=[{"source_url": scraped_articles[0]["url"]}],
+                ),
+                JudgeResult(
+                    accuracy_score=100,
+                    completeness_score=100,
+                    hallucination_detection="No unsupported claims detected in the generated summary.",
+                    unsupported_claims=[],
+                    missing_information=[],
+                    overall_feedback="The report was generated from the supplied source content.",
+                    final_verdict="Pass",
+                ),
+            )
+
+    monkeypatch.setattr(research_router.service.scraper, "scrape_articles", lambda urls: [{"url": urls[0], "article_text": "AI is changing enterprise workflows."}])
+    research_router.service.analyzer = DummyAnalyzer()
+
+    login_response = client.post(
+        "/api/auth/login",
+        json={"email": "user@example.com", "password": "Password123!"},
+    )
+    token = login_response.json()["access_token"]
+
+    client.post(
+        "/api/research",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "competitors": ["OpenAI"],
+            "topics": ["AI"],
+            "urls": ["https://example.com"],
+            "context": "test context",
+        },
+    )
+
+    history_response = client.get("/api/history", headers={"Authorization": f"Bearer {token}"})
+    payload = history_response.json()
+
+    assert history_response.status_code == 200
+    assert payload[0]["title"] == "AI is changing enterprise workflows."
+    assert payload[0]["summary"] == "AI is changing enterprise workflows."
+    assert payload[0]["competitors"] == ["OpenAI"]
+    assert payload[0]["topics"] == ["AI"]
+    assert payload[0]["sources"] == ["https://example.com/"]
 
 
 def test_research_service_is_dynamic_for_any_input():

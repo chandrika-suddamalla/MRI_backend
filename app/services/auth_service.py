@@ -20,7 +20,10 @@ class AuthService:
         logger.info("Login requested for %s", payload.email)
 
         stored_user = user_store.get_user(str(payload.email))
-        if stored_user is None or not verify_password(payload.password, stored_user["password"]):
+        if stored_user is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No account found for this email. Please register first.")
+
+        if not verify_password(payload.password, stored_user["password"]):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
         token = create_access_token(str(payload.email))
