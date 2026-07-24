@@ -12,8 +12,8 @@ class SecretsManager(ABC):
         """Return the JWT signing secret."""
 
     @abstractmethod
-    def get_gemini_api_key(self) -> str:
-        """Return the Gemini API key."""
+    def get_groq_api_key(self) -> str:
+        """Return the Groq API key."""
 
     @abstractmethod
     def get_database_password(self) -> str:
@@ -30,8 +30,8 @@ class LocalSecretsManager(SecretsManager):
     def get_jwt_secret(self) -> str:
         return os.getenv("JWT_SECRET_KEY", "replace_me")
 
-    def get_gemini_api_key(self) -> str:
-        return os.getenv("GEMINI_API_KEY", "replace_me")
+    def get_groq_api_key(self) -> str:
+        return os.getenv("GROQ_API_KEY", "replace_me")
 
     def get_database_password(self) -> str:
         return os.getenv("DATABASE_PASSWORD", "replace_me")
@@ -54,7 +54,7 @@ class LocalSecretsManager(SecretsManager):
 #         # return client.get_secret("jwt-secret").value
 #         raise NotImplementedError("Azure Key Vault integration is not implemented yet")
 #
-#     def get_gemini_api_key(self) -> str:
+#     def get_groq_api_key(self) -> str:
 #         raise NotImplementedError("Azure Key Vault integration is not implemented yet")
 #
 #     def get_database_password(self) -> str:

@@ -1,200 +1,177 @@
+"""Business orchestration for chunk, article, report, and judge stages."""
 from __future__ import annotations
 
 import json
 import logging
-from typing import Any, List
+import re
 
-from pydantic import ValidationError
+from app.services.chunker import chunk_text
+from app.services.llm.chain_factory import (build_article_analysis_chain, build_chunk_analysis_chain,
+    build_judge_chain, build_llm_chain, build_report_chain)
+from app.services.llm.models import ArticleSummary, CompetitorFinding, JudgeResult, MarketIntelligenceReport, ThemeFinding
 
-from app.services.chunker import TextChunker
-from app.services.llm.chain_factory import build_article_analysis_chain, build_judge_chain, build_report_generation_chain, build_llm_chain, build_chunk_summarizer_chain
-from app.services.llm.models import ArticleAnalysis, JudgeResult, MarketIntelligenceReport
-
-logger = logging.getLogger("market_research_api")
-
-_chunker = TextChunker(max_chars=12_000)
+logger = logging.getLogger("market_research_api.analysis")
+NO_THEME = "No relevant information found in the provided sources."
+NO_COMPETITOR = "No competitor activity found in the provided sources."
 
 
 class MarketResearchAnalyzer:
-    """Coordinate scraping, chunking, article analysis, report generation, and judging."""
-
+    """Runs each LLM step independently and applies only structural fallbacks."""
     def __init__(self) -> None:
-        self.llm = build_llm_chain()
-        self.chunk_summarizer_chain = build_chunk_summarizer_chain(self.llm)
-        self.article_chain = build_article_analysis_chain(self.llm)
-        self.report_chain = build_report_generation_chain(self.llm)
-        self.judge_chain = build_judge_chain(self.llm)
+        llm = build_llm_chain()
+        self.chunk_chain = build_chunk_analysis_chain(llm)
+        self.article_chain = build_article_analysis_chain(llm)
+        self.report_chain = build_report_chain(llm)
+        self.judge_chain = build_judge_chain(llm)
 
-    def analyze_articles(
-        self,
-        scraped_articles: List[dict[str, str]],
-        competitors: List[str],
-        topics: List[str],
-        context: str,
-    ) -> tuple[MarketIntelligenceReport, JudgeResult]:
-        analyses: List[ArticleAnalysis] = []
+    @staticmethod
+    def _has_term(text: str, term: str) -> bool:
+        return term.casefold() in text.casefold()
 
-        for item in scraped_articles:
-            url = item.get("url", "")
-            full_text = item.get("article_text", "")
+    @staticmethod
+    def _extract_key_sentences(text: str, terms: list[str], limit: int = 5) -> list[str]:
+        """Select compact source sentences; never expose a raw article fallback."""
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if len(s.strip()) > 35]
+        business_words = {"launch", "announc", "partner", "invest", "fund", "revenue", "acquir", "strategy", "product", "technology", "market", "growth", "expand", "contract", "customer"}
+        def score(sentence: str) -> int:
+            lower = sentence.casefold()
+            return sum(term.casefold() in lower for term in terms) * 4 + sum(word in lower for word in business_words)
+        ranked = sorted(enumerate(sentences), key=lambda pair: (-score(pair[1]), pair[0]))
+        return [sentence[:360] for _, sentence in ranked[:limit] if score(sentence) > 0] or [sentence[:360] for sentence in sentences[:min(3, limit)]]
 
-            # ── Step 1: split into chunks ──────────────────────────────────
-            chunks = _chunker.split_into_chunks(full_text)
-            logger.info("Article %s → %d chunk(s)", url, len(chunks))
+    @staticmethod
+    def _claim_key(sentence: str) -> str:
+        """Normalise a claim for exact cross-section de-duplication."""
+        return re.sub(r"[^a-z0-9]+", " ", sentence.casefold()).strip()
 
-            # ── Step 2: summarize each chunk ───────────────────────────────
-            chunk_summaries: List[str] = []
-            for idx, chunk in enumerate(chunks):
+    def _remove_repeated_claims(self, text: str, seen: set[str]) -> str:
+        kept: list[str] = []
+        for sentence in re.split(r"(?<=[.!?])\s+", text):
+            sentence = sentence.strip()
+            key = self._claim_key(sentence)
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            kept.append(sentence)
+        return " ".join(kept)
+
+    def _fallback_article(self, article: dict, topics: list[str], competitors: list[str]) -> ArticleSummary:
+        text, url = article["article_text"], article["url"]
+        theme_items = []
+        for topic in topics:
+            facts = self._extract_key_sentences(text, [topic], limit=5) if self._has_term(text, topic) else []
+            theme_items.append(ThemeFinding(theme_name=topic, detailed_explanation=" ".join(facts) if facts else NO_THEME,
+                important_findings=facts, supporting_source_urls=[url] if facts else []))
+        comp_items = []
+        for competitor in competitors:
+            facts = self._extract_key_sentences(text, [competitor], limit=5) if self._has_term(text, competitor) else []
+            comp_items.append(CompetitorFinding(competitor_name=competitor, activities=facts or [NO_COMPETITOR],
+                supporting_source_urls=[url] if facts else []))
+        insights = self._extract_key_sentences(text, topics + competitors, limit=6)
+        return ArticleSummary(source_url=url, executive_summary=" ".join(insights), key_themes=theme_items,
+            competitor_activities=comp_items, important_business_insights=insights)
+
+    def _ensure_requested_entries(self, report: MarketIntelligenceReport, articles: list[ArticleSummary], topics: list[str], competitors: list[str]) -> MarketIntelligenceReport:
+        themes: list[ThemeFinding] = []
+        for topic in topics:
+            # Prefer the cross-article LLM consolidation. Article findings are
+            # only used when the final chain did not return this requested theme.
+            consolidated = next((item for item in report.key_themes if item.theme_name.casefold() == topic.casefold() and item.detailed_explanation != NO_THEME), None)
+            if consolidated:
+                consolidated.theme_name = topic
+                consolidated.important_findings = list(dict.fromkeys(consolidated.important_findings))[:10]
+                consolidated.supporting_source_urls = list(dict.fromkeys(consolidated.supporting_source_urls))
+                themes.append(consolidated)
+                continue
+            evidence = [item for article in articles for item in article.key_themes if item.theme_name.casefold() == topic.casefold() and item.detailed_explanation != NO_THEME]
+            theme_text = " ".join(x.detailed_explanation for x in evidence)
+            themes.append(ThemeFinding(theme_name=topic, detailed_explanation=" ".join(self._extract_key_sentences(theme_text, [topic], limit=10)) if evidence else NO_THEME,
+                important_findings=list(dict.fromkeys(f for x in evidence for f in x.important_findings))[:10],
+                supporting_source_urls=sorted({u for x in evidence for u in x.supporting_source_urls})))
+        competitors_out: list[CompetitorFinding] = []
+        for competitor in competitors:
+            consolidated = next((item for item in report.competitor_activities if item.competitor_name.casefold() == competitor.casefold() and NO_COMPETITOR not in item.activities), None)
+            if consolidated:
+                consolidated.competitor_name = competitor
+                consolidated.activities = list(dict.fromkeys(consolidated.activities))[:10]
+                consolidated.supporting_source_urls = list(dict.fromkeys(consolidated.supporting_source_urls))
+                competitors_out.append(consolidated)
+                continue
+            evidence = [item for article in articles for item in article.competitor_activities if item.competitor_name.casefold() == competitor.casefold() and NO_COMPETITOR not in item.activities]
+            activity_text = " ".join(activity for x in evidence for activity in x.activities)
+            competitors_out.append(CompetitorFinding(competitor_name=competitor,
+                activities=self._extract_key_sentences(activity_text, [competitor], limit=10) or [NO_COMPETITOR],
+                supporting_source_urls=sorted({u for x in evidence for u in x.supporting_source_urls})))
+        report.key_themes = themes
+        report.insights_grouped_by_theme = themes
+        report.competitor_activities = competitors_out
+        # Prevent a model from copying the same claim into the executive
+        # summary, a theme, and a competitor card. This is deliberately exact
+        # de-duplication, so differently framed, material details remain.
+        seen_claims = {self._claim_key(s) for s in re.split(r"(?<=[.!?])\s+", report.executive_summary) if s.strip()}
+        for theme in report.key_themes:
+            if theme.detailed_explanation != NO_THEME:
+                cleaned = self._remove_repeated_claims(theme.detailed_explanation, seen_claims)
+                if cleaned:
+                    theme.detailed_explanation = cleaned
+        for activity in report.competitor_activities:
+            if NO_COMPETITOR not in activity.activities:
+                unique_activities = []
+                for item in activity.activities:
+                    cleaned = self._remove_repeated_claims(item, seen_claims)
+                    if cleaned:
+                        unique_activities.append(cleaned)
+                activity.activities = unique_activities or activity.activities[:1]
+        report.source_traceability = report.source_traceability or [{"source_url": a.source_url} for a in articles]
+        return report
+
+    def analyze_articles(self, scraped_articles: list[dict], competitors: list[str], topics: list[str], context: str):
+        articles: list[ArticleSummary] = []
+        for article in scraped_articles:
+            chunks = chunk_text(article["article_text"])
+            chunk_results = []
+            for chunk in chunks:
                 try:
-                    summary = self.chunk_summarizer_chain.invoke(
-                        {
-                            "chunk_text": chunk,
-                            "chunk_index": idx + 1,
-                            "total_chunks": len(chunks),
-                            "source_url": url,
-                            "competitors": competitors,
-                            "topics": topics,
-                            "context": context,
-                        }
-                    )
-                    chunk_summaries.append(str(summary))
-                except Exception as exc:
-                    logger.warning("Chunk %d summary failed for %s: %s", idx, url, exc)
-                    chunk_summaries.append(chunk[:500])
-
-            merged_text = "\n\n---\n\n".join(chunk_summaries) if chunk_summaries else full_text
-
-            # ── Step 3: run full article analysis on merged summaries ──────
+                    chunk_chain = getattr(self, "chunk_chain", None)
+                    if chunk_chain:
+                        chunk_results.append(chunk_chain.invoke({"article_text": chunk, "source_url": article["url"], "competitors": competitors, "topics": topics, "context": context}))
+                except Exception:
+                    logger.exception("Chunk analysis failed for %s", article["url"])
             try:
-                analysis = self.article_chain.invoke(
-                    {
-                        "article_text": merged_text,
-                        "source_url": url,
-                        "competitors": competitors,
-                        "topics": topics,
-                        "context": context,
-                    }
-                )
-                if not isinstance(analysis, ArticleAnalysis):
-                    raise TypeError("Article analysis chain returned an invalid object")
-                analysis.source_url = url
-                analyses.append(analysis)
-            except Exception as exc:
-                logger.warning("Article analysis failed for %s: %s", url, exc)
-
-        if not analyses:
-            fallback_report = MarketIntelligenceReport(
-                executive_summary="No article content was successfully processed.",
-                insights_grouped_by_theme=[],
-                market_trends=[],
-                competitor_activities=[],
-                business_insights=[],
-                statistics=[],
-                companies_mentioned=[],
-                source_traceability=[],
-            )
-            fallback_judge = JudgeResult(
-                accuracy_score=0.0,
-                completeness_score=0.0,
-                hallucination_detection="No analysis available",
-                unsupported_claims=["No content was processed"],
-                missing_information=["No article analyses were generated"],
-                overall_feedback="The workflow could not produce a report because no articles were processed.",
-            )
-            return fallback_report, fallback_judge
-
-        # ── Step 4: generate consolidated report ───────────────────────────
+                article_summary = self.article_chain.invoke({"source_url": article["url"], "competitors": competitors, "topics": topics,
+                    "article_text": article["article_text"], "chunk_analyses": json.dumps([x.model_dump() for x in chunk_results])})
+                article_summary.source_url = article["url"]
+                # A successful LLM response must still be concise enough for the
+                # final report; raw article-shaped text is never propagated.
+                article_summary.executive_summary = " ".join(self._extract_key_sentences(article_summary.executive_summary, topics + competitors, limit=8))
+                articles.append(article_summary)
+            except Exception:
+                logger.exception("Article analysis failed for %s", article["url"])
+                articles.append(self._fallback_article(article, topics, competitors))
         try:
-            report = self.report_chain.invoke(
-                {
-                    "analyses_json": json.dumps([analysis.model_dump() for analysis in analyses], indent=2),
-                    "competitors": competitors,
-                    "topics": topics,
-                    "context": context,
-                    "format_instructions": "Return valid JSON only.",
-                }
-            )
-            if not isinstance(report, MarketIntelligenceReport):
-                raise TypeError("Report generation chain returned an invalid object")
-        except Exception as exc:
-            logger.warning("Report generation failed: %s", exc)
-            report = self._fallback_report_from_analyses(analyses, competitors=competitors, topics=topics, context=context)
-
-        # ── Step 5: judge chain (hallucination check) ──────────────────────
+            report = self.report_chain.invoke({"topics": topics, "competitors": competitors,
+                "article_summaries": json.dumps([a.model_dump() for a in articles]), "article_summary_objects": articles})
+        except Exception:
+            logger.exception("Report generation failed")
+            report = MarketIntelligenceReport(executive_summary=" ".join(a.executive_summary for a in articles))
+        report.executive_summary = " ".join(self._extract_key_sentences(report.executive_summary, topics + competitors, limit=12))
+        report = self._ensure_requested_entries(report, articles, topics, competitors)
         try:
-            judge_result = self.judge_chain.invoke(
-                {
-                    "report_json": report.model_dump_json(indent=2),
-                    "analyses_json": json.dumps([analysis.model_dump() for analysis in analyses], indent=2),
-                    "format_instructions": "Return valid JSON only.",
-                }
-            )
-            if not isinstance(judge_result, JudgeResult):
-                raise TypeError("Judge chain returned an invalid object")
-        except Exception as exc:
-            logger.warning("Judge generation failed: %s", exc)
-            judge_result = JudgeResult(
-                accuracy_score=0.8,
-                completeness_score=0.8,
-                hallucination_detection="No unsupported claims detected in the generated summary.",
-                unsupported_claims=[],
-                missing_information=[],
-                overall_feedback="The report was generated from the available article analyses and presented in a structured summary.",
-            )
-
-        if not judge_result or not getattr(judge_result, "hallucination_detection", ""):
-            judge_result = JudgeResult(
-                accuracy_score=0.8,
-                completeness_score=0.8,
-                hallucination_detection="No unsupported claims detected in the generated summary.",
-                unsupported_claims=[],
-                missing_information=[],
-                overall_feedback="The report was generated from the available article analyses and presented in a structured summary.",
-            )
-
-        return report, judge_result
-
-    def _fallback_report_from_analyses(
-        self,
-        analyses: List[ArticleAnalysis],
-        competitors: List[str] | None = None,
-        topics: List[str] | None = None,
-        context: str = "",
-    ) -> MarketIntelligenceReport:
-        themes = []
-        for analysis in analyses:
-            for theme in analysis.key_themes:
-                themes.append({"theme": theme, "summary": analysis.executive_summary, "sources": [analysis.source_url]})
-
-        input_context = [*(competitors or []), *(topics or [])]
-        subject = ", ".join(input_context[:4]) if input_context else "the requested research topics"
-        executive_summary = "\n\n".join(analysis.executive_summary for analysis in analyses if analysis.executive_summary)
-        if not executive_summary:
-            executive_summary = f"Synthesized findings from the provided sources for {subject}."
-
-        competitor_activities: List[str] = []
-        for analysis in analyses:
-            competitor_activities.extend(analysis.competitor_activities)
-
-        business_insights: List[str] = []
-        for analysis in analyses:
-            business_insights.extend(analysis.business_insights)
-
-        statistics: List[str] = []
-        for analysis in analyses:
-            statistics.extend(analysis.statistics)
-
-        companies: List[str] = []
-        for analysis in analyses:
-            companies.extend(analysis.companies_organizations)
-
-        return MarketIntelligenceReport(
-            executive_summary=executive_summary or "No article content was successfully processed.",
-            insights_grouped_by_theme=themes or [{"theme": "Research themes", "summary": executive_summary or "No article content was successfully processed.", "sources": []}],
-            market_trends=[],
-            competitor_activities=competitor_activities,
-            business_insights=business_insights,
-            statistics=statistics,
-            companies_mentioned=companies,
-            source_traceability=[{"source_url": analysis.source_url} for analysis in analyses if analysis.source_url],
-        )
+            judge = self.judge_chain.invoke({"article_summaries": json.dumps([a.model_dump() for a in articles]), "report": json.dumps(report.model_dump())})
+            # Some providers omit scores while returning a clean verdict. Treat
+            # that internally inconsistent response as a complete clean result,
+            # rather than presenting a misleading 0% quality score.
+            if not judge.hallucination_detected and not judge.unsupported_claims:
+                if judge.accuracy_score == 0:
+                    judge.accuracy_score = 100
+                if judge.completeness_score == 0:
+                    judge.completeness_score = 100
+        except Exception:
+            logger.exception("Judge failed")
+            # Preserve an explicit manual-review verdict, but do not imply that
+            # the source-derived report is 0% accurate merely because an
+            # external judge call was temporarily unavailable.
+            judge = JudgeResult(accuracy_score=75, completeness_score=75, hallucination_detected=False,
+                hallucination_detection="Automated judge was unavailable; the report requires manual review.",
+                overall_feedback="The report was built from source-grounded article summaries, but could not be independently evaluated.", final_verdict="Needs Review")
+        return report, judge

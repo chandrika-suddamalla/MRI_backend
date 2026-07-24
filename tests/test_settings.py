@@ -23,13 +23,13 @@ def test_settings_exposes_non_sensitive_values(monkeypatch):
 
 def test_settings_exposes_secrets_via_secrets_manager(monkeypatch):
     monkeypatch.setenv("JWT_SECRET_KEY", "secret-value")
-    monkeypatch.setenv("GEMINI_API_KEY", "gemini-value")
+    monkeypatch.setenv("GROQ_API_KEY", "groq-value")
     monkeypatch.setenv("DATABASE_PASSWORD", "db-pass")
 
     config = Settings()
 
     assert config.secrets.get_jwt_secret() == "secret-value"
-    assert config.secrets.get_gemini_api_key() == "gemini-value"
+    assert config.secrets.get_groq_api_key() == "groq-value"
     assert config.secrets.get_database_password() == "db-pass"
 
 
