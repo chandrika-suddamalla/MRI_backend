@@ -20,7 +20,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=list(settings.allowed_origins),
+    allow_origins=[
+        "https://mri-frontend-4opxigsvf-mri-agent.vercel.app",
+        *list(settings.allowed_origins),
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
