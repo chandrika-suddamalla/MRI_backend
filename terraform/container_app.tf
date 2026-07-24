@@ -74,7 +74,7 @@ resource "azurerm_container_app" "mi_app" {
 
       env {
         name  = "APP_VERSION"
-        value = "1.0.0"
+        value = "1.2.1"
       }
 
       env {

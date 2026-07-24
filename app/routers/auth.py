@@ -12,7 +12,7 @@ def login(payload: LoginRequest) -> TokenResponse:
     return service.login(payload)
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 def register(payload: RegisterRequest) -> TokenResponse:
     """Register a new user account and return a JWT access token."""
     return service.register(payload)
