@@ -4,6 +4,22 @@
 
 ---
 
+# Live Application
+
+| Component | Link |
+|----------|------|
+| Frontend | **https://mri-frontend-4opxigsvf-mri-agent.vercel.app/** |
+| Backend API | **https://mi-backend-dev-app.agreeablepebble-c7083890.westus2.azurecontainerapps.io** |
+
+---
+
+### Note
+
+- The frontend is hosted on **Vercel**, and the backend is deployed on **Microsoft Azure Container Apps**.
+- The application extracts webpage content using **Trafilatura** before generating AI-powered market intelligence reports.
+- While Trafilatura **performs well for most blogs, articles, and announcement pages,** some websites may not be parsed successfully if they rely heavily on JavaScript rendering, implement anti-bot protections, or use non-standard HTML structures.
+- If content extraction is unsuccessful for a particular URL, the generated report may contain limited or no insights for that source. Using publicly accessible, static content pages generally provides the best results.
+
 #### Example static page URLs (sample test data)
 
 - https://openai.com/index/gpt-4-1/
@@ -33,15 +49,6 @@ The **Market Research Intelligence Assistant (MRI)** automates this process by a
 - Trace every insight back to its original source
 - Verify generated insights using an **LLM-as-a-Judge** approach
 - Store previously generated reports for future reference
-
----
-
-# Live Application
-
-| Component | Link |
-|----------|------|
-| Frontend | **https://mri-frontend-4opxigsvf-mri-agent.vercel.app/** |
-| Backend API | **https://mi-backend-dev-app.agreeablepebble-c7083890.westus2.azurecontainerapps.io** |
 
 ---
 
