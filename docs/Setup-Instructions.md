@@ -225,20 +225,22 @@ The deployment process consists of:
 
 ---
 
-# Environment Configuration
-
-The application separates configuration from code using environment variables.
+## Environment Configuration
 
 | Variable | Description |
 |-----------|-------------|
 | `APP_NAME` | Application name |
 | `ENVIRONMENT` | Runtime environment |
-| `JWT_SECRET_KEY` | Secret used to sign JWT tokens |
+| `JWT_SECRET_KEY` | JWT signing secret |
 | `JWT_ALGORITHM` | JWT signing algorithm |
 | `JWT_EXPIRATION_MINUTES` | Access token lifetime |
-| `GEMINI_API_KEY` | Google Gemini API key |
-| `DATABASE_URL` | Database connection string |
-| `ALLOWED_ORIGINS` | Frontend origins allowed via CORS |
+| `GROQ_API_KEY` | Groq API key |
+| `COSMOS_ENDPOINT` | Azure Cosmos DB endpoint |
+| `COSMOS_KEY` | Azure Cosmos DB primary key |
+| `COSMOS_DATABASE_NAME` | Cosmos database name |
+| `COSMOS_USERS_CONTAINER` | Users container |
+| `COSMOS_REPORTS_CONTAINER` | Reports container |
+| `ALLOWED_ORIGINS` | Allowed frontend origins |
 
 This approach improves portability across development, testing, and production environments.
 
