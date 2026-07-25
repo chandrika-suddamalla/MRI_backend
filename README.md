@@ -236,9 +236,3 @@ The current implementation focuses on delivering the core assignment requirement
 Generative AI tools were used to assist with implementation, debugging, documentation, and code refinement. All generated code and documentation were reviewed, validated, and modified before submission.
 
 ---
-
-# Author
-
-**Chandrika Suddamalla**
-
-Software Engineer | Backend Development | AI Applications
