@@ -212,28 +212,6 @@ Stored Report
 
 ---
 
-# Screenshots
-
-> Add screenshots before submission.
-
-Suggested images:
-
-```
-docs/
-
-├── login.png
-
-├── dashboard.png
-
-├── report.png
-
-├── history.png
-
-└── verification.png
-```
-
----
-
 # Future Improvements
 
 The current implementation focuses on delivering the core assignment requirements while maintaining a modular architecture. The following enhancements could further improve the application:
