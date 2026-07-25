@@ -155,19 +155,6 @@ sequenceDiagram
 
 ---
 
-# Repository Structure
-
-```
-MRI/
-
-├── MRI_frontend/
-
-└── MRI_backend/
-```
-
-
----
-
 # AI Pipeline
 
 ```text
