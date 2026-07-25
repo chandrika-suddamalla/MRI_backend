@@ -39,41 +39,41 @@ The **Market Research Intelligence Assistant (MRI)** automates this process by a
 
 ### Register Page
 
-![Register Page](/MRI_frontend/Images/register.jpg)
+![Register Page](Images/register.jpg)
 
 ### Login page
 
-![Login Page](/MRI_frontend/Images/login.jpg)
+![Login Page](Images/login.jpg)
 
 ### Dashboard
 
-![Dashboard](/MRI_frontend/Images/dashboard.jpg)
+![Dashboard](Images/dashboard.jpg)
 
 ### Report Generation Stages
 
-![Report Generation Stages](/MRI_frontend/Images/report_generation.jpg)
+![Report Generation Stages](Images/report_generation.jpg)
 
 ### Output 
 
-![output](/MRI_frontend/Images/output.jpg)
+![output](Images/output.jpg)
 
-![output-2](/MRI_frontend/Images/output-2.jpg)
+![output-2](Images/output-2.jpg)
 
 ### save report as PDF
 
-![save report](/MRI_frontend/Images/save_report.jpg)
+![save report](Images/save_report.jpg)
 
 ### Navigation Pane
 
-![Navigation pane](/MRI_frontend/Images/navigation_pane.jpg)
+![Navigation pane](Images/navigation_pane.jpg)
 
 ### History Reports
 
-![History page](/MRI_frontend/Images/History_page.jpg)
+![History page](Images/History_page.jpg)
 
 ### Profile page
 
-![profile page](/MRI_frontend/Images/profile_page.jpg)
+![profile page](Images/profile_page.jpg)
 
 ---
 
