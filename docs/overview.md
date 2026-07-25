@@ -260,7 +260,7 @@ sequenceDiagram
 | Framework | FastAPI |
 | Authentication | JWT |
 | Password Security | PBKDF2-HMAC-SHA256 |
-| AI Model | Google Groq |
+| AI Model | Groq(Meta Llama 3.3 70B Versatile, accessed through the Groq API)|
 | Validation | LLM-as-a-Judge |
 | Web Scraping | BeautifulSoup |
 | Data Validation | Pydantic |
