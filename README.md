@@ -4,6 +4,23 @@
 
 ---
 
+#### Example static page URLs (sample test data)
+
+- https://openai.com/index/gpt-4-1/
+- https://openai.com/index/hello-gpt-4o/
+- https://openai.com/index/introducing-o3-and-o4-mini/
+- https://openai.com/news/
+- https://www.anthropic.com/news/claude-4
+- https://www.anthropic.com/news/claude-3-7-sonnet
+- https://www.anthropic.com/news
+- https://blog.google/technology/google-deepmind/gemini-2-5/
+- https://blog.google/technology/ai/
+- https://ai.meta.com/blog/
+- https://blogs.microsoft.com/blog/category/ai/
+- https://blogs.nvidia.com/blog/category/ai/
+
+- use competitors , topics from above urls to generate reports 
+
 ## Project Overview
 
 Market intelligence is often scattered across blogs, company announcements, news articles, and product pages. Manually collecting and analysing this information is time-consuming and difficult to validate.
